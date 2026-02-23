@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>Attendance Diary</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <style>
+        /* Emergency loading styles */
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            color: white;
+            font-size: 1.2rem;
+        }
+    </style>
+</head>
+<body>
+    <div id="loadingScreen" class="loading-screen">
+        <div>Loading Attendance Diary...</div>
+    </div>
+
+    <!-- ==================== AUTH SCREEN ==================== -->
+    <div id="authScreen" style="display: none;">
+        <div class="auth-container">
+            <div class="auth-header">
+                <div class="logo">📒</div>
+                <h1>Welcome Back</h1>
+                <p class="time-display" id="authTime">10:30 AM</p>
+                <p class="date-display" id="authDate">WED, MAY 22</p>
+            </div>
+            
+            <div class="auth-box">
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="authEmail" placeholder="Enter your email" value="test@example.com">
+                </div>
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="authPassword" placeholder="Enter password" value="password123">
+                </div>
+                
+                <div class="auth-buttons">
+                    <button onclick="handleLogin()" class="primary-btn">Login</button>
+                </div>
+                
+                <p class="auth-switch">
+                    Don't have an account? <a href="#" onclick="showRegister()">Register</a>
+                </p>
+                
+                <div id="authError" class="auth-error"></div>
+            </div>
+            
+            <div class="auth-footer">
+                <p>Join Us!</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== REGISTER SCREEN ==================== -->
+    <div id="registerScreen" style="display: none;">
+        <div class="auth-container">
+            <div class="auth-header">
+                <div class="logo">📒</div>
+                <h1>Create Account</h1>
+                <p class="time-display" id="registerTime">10:30 AM</p>
+                <p class="date-display" id="registerDate">WED, MAY 22</p>
+            </div>
+            
+            <div class="auth-box">
+                <div class="input-group">
+                    <label>Name</label>
+                    <input type="text" id="registerName" placeholder="Your name">
+                </div>
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="registerEmail" placeholder="Enter your email">
+                </div>
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="registerPassword" placeholder="Min 6 characters">
+                </div>
+                
+                <div class="auth-buttons">
+                    <button onclick="handleRegister()" class="primary-btn">Register</button>
+                </div>
+                
+                <p class="auth-switch">
+                    Already have an account? <a href="#" onclick="showLogin()">Login</a>
+                </p>
+                
+                <div id="registerError" class="auth-error"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MAIN APP ==================== -->
+    <div id="appScreen" style="display: none;">
+        <!-- Top Navigation -->
+        <nav class="top-nav">
+            <div class="time-date">
+                <span class="time" id="currentTime">10:30 AM</span>
+                <span class="date" id="currentDate">WED, MAY 22</span>
+            </div>
+            <div class="sync-status" id="syncStatus" onclick="manualSync()">
+                <span class="sync-icon">🔄</span>
+                <span class="sync-text">SYNC IN</span>
+                <span class="last-sync" id="lastSyncTime">Last sync: 10:36 AM</span>
+            </div>
+        </nav>
+
+        <!-- Main Navigation Tabs -->
+        <div class="main-tabs">
+            <button class="tab-btn active" onclick="switchTab('home')">🏠 Home</button>
+            <button class="tab-btn" onclick="switchTab('schedule')">📅 Schedule</button>
+            <button class="tab-btn" onclick="switchTab('search')">🔍 Search</button>
+            <button class="tab-btn" onclick="switchTab('balance')">💰 Balance</button>
+        </div>
+
+        <!-- ========== HOME TAB ========== -->
+        <div id="homeTab" class="tab-pane active">
+            <!-- Quick Action Cards -->
+            <div class="action-cards">
+                <div class="action-card check-in" onclick="checkIn()">
+                    <div class="card-icon">⏰</div>
+                    <div class="card-label">CHECK-IN</div>
+                </div>
+                <div class="action-card check-out" onclick="checkOut()">
+                    <div class="card-icon">🚪</div>
+                    <div class="card-label">CHECK OUT</div>
+                </div>
+            </div>
+
+            <!-- Status Buttons -->
+            <div class="status-buttons">
+                <button class="status-btn" onclick="markLeave('annual')">ANNUAL</button>
+                <button class="status-btn" onclick="markLeave('sick')">SICK</button>
+                <button class="status-btn" onclick="markLeave('casual')">CASUAL</button>
+                <button class="status-btn" onclick="markLeave('cpl')">CPL</button>
+                <button class="status-btn off-day" onclick="markOffDay()">OFF-DAY</button>
+            </div>
+
+            <!-- Today's Entry Card (if exists) -->
+            <div id="todayEntryCard" class="today-card" style="display: none;">
+                <div class="card-header">
+                    <h3>Today's Entry</h3>
+                    <button class="edit-btn" onclick="editToday()">✏️ Edit</button>
+                </div>
+                <div class="entry-details" id="todayDetails"></div>
+            </div>
+
+            <!-- Manual Override Section -->
+            <div class="manual-override" id="manualOverride" style="display: none;">
+                <h4>Manual Time Entry</h4>
+                <div class="override-form">
+                    <input type="date" id="overrideDate" class="override-input">
+                    <input type="time" id="overrideCheckIn" class="override-input" placeholder="Check-In">
+                    <input type="time" id="overrideCheckOut" class="override-input" placeholder="Check-Out">
+                    <div class="override-actions">
+                        <button onclick="saveManualEntry()" class="primary-btn small">Save</button>
+                        <button onclick="cancelManualOverride()" class="secondary-btn small">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== SCHEDULE TAB ========== -->
+        <div id="scheduleTab" class="tab-pane">
+            <div class="schedule-header">
+                <h3>Weekly Template</h3>
+                <button class="primary-btn small" onclick="showBulkSettings()">Bulk Settings</button>
+            </div>
+
+            <!-- Weekly Template Table -->
+            <div class="template-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Day</th>
+                            <th>Base Work</th>
+                            <th>Max OT</th>
+                            <th>CPL Grant</th>
+                        </tr>
+                    </thead>
+                    <tbody id="weeklyTemplate"></tbody>
+                </table>
+            </div>
+
+            <!-- Apply to Date Range -->
+            <div class="apply-range" id="bulkSettings" style="display: none;">
+                <h4>Apply Template to Date Range</h4>
+                <div class="range-inputs">
+                    <input type="date" id="rangeFrom" class="range-input">
+                    <input type="date" id="rangeTo" class="range-input">
+                </div>
+                <div class="special-sunday">
+                    <label>1st Sunday Rule:</label>
+                    <input type="checkbox" id="specialSunday" checked> Enable
+                </div>
+                <button onclick="applyTemplateToRange()" class="primary-btn">APPLY TO DATE RANGE</button>
+            </div>
+
+            <!-- Single Date Override -->
+            <div class="single-override">
+                <h4>Single Date Override</h4>
+                <div class="override-grid">
+                    <input type="date" id="overrideSingleDate" class="override-input">
+                    <select id="overrideSingleType" class="override-select">
+                        <option value="work">Work Day</option>
+                        <option value="holiday">Holiday</option>
+                        <option value="off">Off Day</option>
+                    </select>
+                    <input type="number" id="overrideSingleBase" placeholder="Base Hours" step="0.5" min="0">
+                    <input type="number" id="overrideSingleOT" placeholder="OT Cap" step="0.5" min="0">
+                    <input type="number" id="overrideSingleCPL" placeholder="CPL Grant" step="0.5" min="0">
+                    <button onclick="saveSingleOverride()" class="primary-btn">Save Override</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== SEARCH TAB ========== -->
+        <div id="searchTab" class="tab-pane">
+            <!-- OT Summary Cards -->
+            <div class="summary-cards">
+                <div class="summary-card">
+                    <span class="card-label">OT This Month</span>
+                    <span class="card-value" id="otThisMonth">22.5</span>
+                    <span class="card-unit">Hours</span>
+                </div>
+                <div class="summary-card">
+                    <span class="card-label">OT Last Month</span>
+                    <span class="card-value" id="otLastMonth">18.0</span>
+                    <span class="card-unit">Hours</span>
+                </div>
+            </div>
+
+            <!-- Search Filters -->
+            <div class="search-filters">
+                <div class="filter-row">
+                    <div class="filter-item">
+                        <label>FROM:</label>
+                        <input type="date" id="searchFrom">
+                    </div>
+                    <div class="filter-item">
+                        <label>TO:</label>
+                        <input type="date" id="searchTo">
+                   
