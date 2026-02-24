@@ -1,0 +1,14 @@
+{
+  "name": "attendance-tracker",
+  "version": "1.0.0",
+  "description": "Professional Attendance & Leave Management PWA",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel deploy --prod"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^0.9.0",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2"
+  }
+}
