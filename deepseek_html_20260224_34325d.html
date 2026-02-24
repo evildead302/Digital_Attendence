@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>Attendance Diary</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- Debug Panel Styles -->
+    <style>
+        #debugPanel {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            padding: 10px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 11px;
+            max-width: 300px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 9999;
+            border: 2px solid #4CAF50;
+            display: none;
+        }
+        
+        #debugToggle {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+            cursor: pointer;
+            z-index: 10000;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+    <!-- Debug Toggle -->
+    <button id="debugToggle" onclick="toggleDebug()">🔍</button>
+    
+    <!-- Debug Panel -->
+    <div id="debugPanel">
+        <div id="debugHeader">
+            <strong>📊 DEBUG PANEL</strong>
+            <button id="debugClear" onclick="clearDebugLogs()">Clear</button>
+        </div>
+        <div id="debugLogs"></div>
+    </div>
+
+    <!-- ==================== LOGIN PAGE (EXACTLY AS IMAGE) ==================== -->
+    <div id="loginScreen">
+        <div class="login-container">
+            <div class="logo">📒</div>
+            <h1>Welcome Back</h1>
+            
+            <div class="login-form">
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="loginEmail" placeholder="Email" value="test@example.com">
+                </div>
+                
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="loginPassword" placeholder="Password" value="password123">
+                </div>
+                
+                <button onclick="login()" class="login-btn">Login</button>
+                
+                <div class="register-link">
+                    Don't have an account? <a href="#" onclick="showRegister()">Register</a>
+                </div>
+                
+                <div id="loginError" class="error-message"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== REGISTER PAGE ==================== -->
+    <div id="registerScreen" style="display: none;">
+        <div class="login-container">
+            <div class="logo">📒</div>
+            <h1>Create Account</h1>
+            
+            <div class="login-form">
+                <div class="input-group">
+                    <label>Name</label>
+                    <input type="text" id="registerName" placeholder="Full Name">
+                </div>
+                
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="registerEmail" placeholder="Email">
+                </div>
+                
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="registerPassword" placeholder="Min 6 characters">
+                </div>
+                
+                <button onclick="register()" class="login-btn">Register</button>
+                
+                <div class="register-link">
+                    Already have an account? <a href="#" onclick="showLogin()">Login</a>
+                </div>
+                
+                <div id="registerError" class="error-message"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MAIN APP ==================== -->
+    <div id="appScreen" style="display: none;">
+        <!-- Navigation Tabs -->
+        <div class="nav-tabs">
+            <button class="tab-btn active" onclick="switchTab('home')">Home</button>
+            <button class="tab-btn" onclick="switchTab('schedule')">Schedule</button>
+            <button class="tab-btn" onclick="switchTab('history')">History</button>
+            <button class="tab-btn" onclick="switchTab('balance')">Balance</button>
+        </div>
+
+        <!-- ========== HOME TAB (EXACTLY AS IMAGE) ========== -->
+        <div id="homeTab" class="tab-pane active">
+            <!-- Top Bar with Time -->
+            <div class="home-top-bar">
+                <div class="home-time-container">
+                    <span class="home-time" id="homeTime">10:43</span>
+                    <span class="home-time-period" id="homePeriod">AM</span>
+                </div>
+                <div class="home-date" id="homeDate">WED, MAY 22</div>
+            </div>
+
+            <!-- For Enter For Previous Entries -->
+            <div class="previous-entries-link" onclick="showManualEntry()">
+                For enter for previous entries
+            </div>
+
+            <!-- Check In/Out Cards -->
+            <div class="check-cards">
+                <div class="check-card check-in" onclick="checkIn()">
+                    <div class="check-time" id="checkInDisplay">--:--</div>
+                    <div class="check-label">CHECK-IN</div>
+                </div>
+                <div class="check-card check-out" onclick="checkOut()">
+                    <div class="check-time" id="checkOutDisplay">--:--</div>
+                    <div class="check-label">CHECK-OUT</div>
+                </div>
+            </div>
+
+            <!-- Leave Buttons Grid (5 buttons as in image) -->
+            <div class="leave-grid">
+                <button class="leave-btn annual" onclick="markLeave('annual')">ANNUAL</button>
+                <button class="leave-btn sick" onclick="markLeave('sick')">SICK</button>
+                <button class="leave-btn offday" onclick="markOffDay()">OFF-DAY</button>
+                <button class="leave-btn casual" onclick="markLeave('casual')">CASUAL</button>
+                <button class="leave-btn cpl" onclick="markLeave('cpl')">CPL</button>
+            </div>
+
+            <!-- Sync Buttons -->
+            <div class="sync-buttons">
+                <button class="sync-btn sync-in" onclick="syncFromCloud()">
+                    <span class="sync-icon">🔄</span>
+                    SYNC IN
+                </button>
+                <button class="sync-btn sync-out" onclick="syncToCloud()">
+                    <span class="sync-icon">⬆️</span>
+                    SYNC OUT
+                </button>
+            </div>
+
+            <!-- Last Sync Time -->
+            <div class="last-sync" id="lastSyncTime">Last sync: --:--</div>
+
+            <!-- Manual Entry Modal (Hidden by default) -->
+            <div id="manualEntryModal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <h3>Manual Entry</h3>
+                    <input type="date" id="manualDate" class="modal-input">
+                    <input type="time" id="manualIn" class="modal-input" placeholder="Check In">
+                    <input type="time" id="manualOut" class="modal-input" placeholder="Check Out">
+                    <select id="manualType" class="modal-input">
+                        <option value="work">Work Day</option>
+                        <option value="annual">Annual Leave</option>
+                        <option value="sick">Sick Leave</option>
+                        <option value="casual">Casual Leave</option>
+                        <option value="cpl">CPL</option>
+                        <option value="off">Off Day</option>
+                    </select>
+                    <div class="modal-buttons">
+                        <button onclick="saveManualEntry()" class="modal-save">Save</button>
+                        <button onclick="closeManualEntry()" class="modal-cancel">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== SCHEDULE TAB ========== -->
+        <div id="scheduleTab" class="tab-pane">
+            <h2>Schedule</h2>
+            
+            <!-- Weekly Template -->
+            <div class="schedule-section">
+                <h3>Weekly Template</h3>
+                <table class="template-table">
+                    <thead>
+                        <tr>
+                            <th>Day</th>
+                            <th>Base</th>
+                            <th>OT Cap</th>
+                            <th>CPL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Monday</td><td><input type="number" id="monBase" value="8" step="0.5"></td><td><input type="number" id="monOT" value="1" step="0.5"></td><td><input type="number" id="monCPL" value="0" step="0.5"></td></tr>
+                        <tr><td>Tuesday</td><td><input type="number" id="tueBase" value="8" step="0.5"></td><td><input type="number" id="tueOT" value="1" step="0.5"></td><td><input type="number" id="tueCPL" value="0" step="0.5"></td></tr>
+                        <tr><td>Wednesday</td><td><input type="number" id="wedBase" value="8" step="0.5"></td><td><input type="number" id="wedOT" value="1" step="0.5"></td><td><input type="number" id="wedCPL" value="0" step="0.5"></td></tr>
+                        <tr><td>Thursday</td><td><input type="number" id="thuBase" value="8" step="0.5"></td><td><input type="number" id="thuOT" value="1" step="0.5"></td><td><input type="number" id="thuCPL" value="0" step="0.5"></td></tr>
+                        <tr><td>Friday</td><td><input type="number" id="friBase" value="8" step="0.5"></td><td><input type="number" id="friOT" value="1" step="0.5"></td><td><input type="number" id="friCPL" value="0" step="0.5"></td></tr>
+                        <tr><td>Saturday</td><td><input type="number" id="satBase" value="6" step="0.5"></td><td><input type="number" id="satOT" value="0.5" step="0.5"></td><td><input type="number" id="satCPL" value="0" step="0.5"></td></tr>
+                        <tr><td>1st Sunday</td><td><input type="number" id="sun1Base" value="8" step="0.5"></td><td><input type="number" id="sun1OT" value="0" step="0.5"></td><td><input type="number" id="sun1CPL" value="1.0" step="0.5"></td></tr>
+                        <tr><td>Other Sunday</td><td><input type="number" id="sun2Base" value="6" step="0.5"></td><td><input type="number" id="sun2OT" value="0" step="0.5"></td><td><input type="number" id="sun2CPL" value="0.5" step="0.5"></td></tr>
+                    </tbody>
+                </table>
+                <button onclick="saveTemplate()" class="save-template-btn">Save Template</button>
+            </div>
+
+            <!-- Apply to Date Range -->
+            <div class="schedule-section">
+                <h3>Apply to Date Range</h3>
+                <div class="date-range">
+                    <input type="date" id="rangeFrom" class="range-input">
+                    <span>to</span>
+                    <input type="date" id="rangeTo" class="range-input">
+                </div>
+                <button onclick="applyTemplateToRange()" class="apply-range-btn">Apply to Range</button>
+            </div>
+        </div>
+
+        <!-- ========== HISTORY TAB ========== -->
+        <div id="historyTab" class="tab-pane">
+            <h2>History</h2>
+            
+            <!-- Date Filters -->
+            <div class="history-filters">
+                <div class="filter-row">
+                    <label>FROM:</label>
+                    <input type="date" id="historyFrom">
+                </div>
+                <div class="filter-row">
+                    <label>TO:</label>
+                    <input type="date" id="historyTo">
+                </div>
+            </div>
+
+            <!-- Filter Buttons -->
+            <div class="filter-buttons">
+                <button class="filter-btn" onclick="filterHistory('all')">ALL</button>
+                <button class="filter-btn" onclick="filterHistory('ot')">OT</button>
+                <button class="filter-btn" onclick="filterHistory('cpl')">CPL</button>
+                <button class="filter-btn" onclick="filterHistory('leave')">LEAVE</button>
+            </div>
+
+            <!-- History List -->
+            <div id="historyList" class="history-list"></div>
+        </div>
+
+        <!-- ========== BALANCE TAB ========== -->
+        <div id="balanceTab" class="tab-pane">
+            <h2>Balance</h2>
+            
+            <div class="balance-card">
+                <div class="balance-label">AL Balance</div>
+                <div class="balance-value" id="alBalance">15.49</div>
+                <div class="balance-note">days</div>
+            </div>
+            
+            <div class="balance-card">
+                <div class="balance-label">SL Balance</div>
+                <div class="balance-value" id="slBalance">7.0</div>
+                <div class="balance-note">days</div>
+            </div>
+            
+            <div class="balance-card">
+                <div class="balance-label">CL Balance</div>
+                <div class="balance-value" id="clBalance">7.0</div>
+                <div class="balance-note">days</div>
+            </div>
+            
+            <div class="balance-card">
+                <div class="balance-label">CPL Balance</div>
+                <div class="balance-value" id="cplBalance">8.5</div>
+                <div class="balance-note">days</div>
+            </div>
+            
+            <div class="ot-card">
+                <div class="ot-label">OT This Month</div>
+                <div class="ot-value" id="otMonth">22.5</div>
+                <div class="ot-unit">Hours</div>
+            </div>
+            
+            <button onclick="recalculateAll()" class="recalc-btn">RECALCULATE ALL</button>
+        </div>
+    </div>
+
+    <!-- Logout Button (Fixed at bottom) -->
+    <div id="logoutContainer" style="display: none;">
+        <button onclick="logout()" class="logout-bottom-btn">Log Out</button>
+    </div>
+
+    <script src="db.js"></script>
+    <script src="app.js"></script>
+    
+    <script>
+        // Debug functions
+        window.debugLogs = [];
+        
+        window.addDebugLog = function(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            window.debugLogs.push({ time: timestamp, message, type });
+            
+            const debugLogsDiv = document.getElementById('debugLogs');
+            if (debugLogsDiv) {
+                const logDiv = document.createElement('div');
+                logDiv.className = `debug-log debug-${type}`;
+                logDiv.innerHTML = `<span style="color:#888">[${timestamp}]</span> ${message}`;
+                debugLogsDiv.appendChild(logDiv);
+                debugLogsDiv.scrollTop = debugLogsDiv.scrollHeight;
+            }
+            console.log(`[${type}] ${message}`);
+        };
+        
+        window.toggleDebug = function() {
+            const panel = document.getElementById('debugPanel');
+            panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+        };
+        
+        window.clearDebugLogs = function() {
+            window.debugLogs = [];
+            document.getElementById('debugLogs').innerHTML = '<div class="debug-log">Logs cleared</div>';
+        };
+        
+        // Auto-show debug on load
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('debugPanel').style.display = 'block';
+            addDebugLog('=== DEBUG SYSTEM INITIALIZED ===', 'success');
+        });
+    </script>
+</body>
+</html>
