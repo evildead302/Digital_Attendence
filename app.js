@@ -21,7 +21,7 @@
         wednesday: { base: 8, maxOT: 1, cpl: 0 },
         thursday: { base: 8, maxOT: 1, cpl: 0 },
         friday: { base: 8, maxOT: 1, cpl: 0 },
-        saturday: { base: 6, maxOT: 0.5, cpl: 0 },
+        saturday: { base: 8, maxOT: 1, cpl: 0 },
         // Sunday alternating pattern
         sundayOdd: { base: 8, maxOT: 0, cpl: 1.0 },  // 1st, 3rd, 5th Sundays
         sundayEven: { base: 6, maxOT: 0, cpl: 0.5 }  // 2nd, 4th Sundays
