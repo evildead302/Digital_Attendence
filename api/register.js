@@ -10,10 +10,10 @@ function generateUserId() {
     let result = '';
     const timestamp = Date.now().toString(36);
     result += timestamp;
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 8; i++) {
         result += chars[Math.floor(Math.random() * chars.length)];
     }
-    return result.substring(0, 13);
+    return result.substring(0, 50);
 }
 
 export default async function handler(req, res) {
