@@ -1591,14 +1591,19 @@
                     alert('Email verified successfully! You can now login.');
                     showLogin();
                 } else if (verificationPurpose === 'reset') {
-                    window.addDebugLog('OTP verified for password reset, showing reset modal', 'success');
-                    // Increased delay to ensure OTP modal is fully closed
-                    setTimeout(() => {
-                        window.addDebugLog(`Calling showResetPasswordModal with email: ${pendingEmail}`, 'info');
-                        showResetPasswordModal(pendingEmail);
-                    }, 500);
-                }
-            } else {
+    window.addDebugLog('OTP verified for password reset, showing reset modal', 'success');
+    window.addDebugLog(`Calling showResetPasswordModal with email: ${pendingEmail}`, 'info');
+    // Increased delay to ensure OTP modal is fully closed
+    setTimeout(function() {
+        window.addDebugLog(`Inside setTimeout, calling showResetPasswordModal now`, 'info');
+        try {
+            showResetPasswordModal(pendingEmail);
+            window.addDebugLog(`showResetPasswordModal executed successfully`, 'success');
+        } catch (err) {
+            window.addDebugLog(`Error in showResetPasswordModal: ${err.message}`, 'error');
+        }
+    }, 500);
+                } else {
                 const errorMsg = data.message || 'Verification failed';
                 window.addDebugLog(`❌ OTP verification failed: ${errorMsg}`, 'error');
                 document.getElementById('otpError').textContent = errorMsg;
