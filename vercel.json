@@ -7,7 +7,7 @@
   },
   "crons": [
     {
-      "path": "/api/notifications?action=cron",
+      "path": "/api/notifications",
       "schedule": "*/10 * * * *"
     }
   ],
