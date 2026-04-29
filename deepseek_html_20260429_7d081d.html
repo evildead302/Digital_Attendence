@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Push Notification Key Test</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            padding: 20px;
+            margin: 0;
+        }
+        .container { max-width: 600px; margin: 0 auto; }
+        h1 { font-size: 1.5rem; text-align: center; color: #6c63ff; }
+        .card {
+            background: #16213e;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #2a3a5e;
+        }
+        .card h2 {
+            font-size: 1.2rem;
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: #6c63ff;
+        }
+        button {
+            background: #6c63ff;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 5px 5px 5px 0;
+            transition: opacity 0.2s;
+        }
+        button:active { opacity: 0.8; }
+        button.secondary { background: #2a3a5e; }
+        button.danger { background: #e74c3c; }
+        pre {
+            background: #0f0f1a;
+            padding: 15px;
+            border-radius: 10px;
+            overflow-x: auto;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+            margin-top: 15px;
+            margin-bottom: 0;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        .status.success { background: #1a5f2a; color: #8ce99a; }
+        .status.error { background: #7a2e2e; color: #ffaaaa; }
+        .status.info { background: #2a3a5e; color: #aaccff; }
+        .key-box {
+            background: #0f0f1a;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 11px;
+            word-break: break-all;
+        }
+        hr { border-color: #2a3a5e; margin: 15px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Push Notification Key Test</h1>
+        <p style="text-align: center; color: #aaa; font-size: 14px;">Testing different methods to extract p256dh and auth keys</p>
+
+        <!-- Step 1: Check Support -->
+        <div class="card">
+            <h2>📱 Step 1: Browser Support</h2>
+            <button onclick="checkSupport()">Check Browser Support</button>
+            <pre id="supportOutput">Click button to check...</pre>
+        </div>
+
+        <!-- Step 2: Request Permission -->
+        <div class="card">
+            <h2>🔔 Step 2: Notification Permission</h2>
+            <button onclick="requestPermission()">Request Permission</button>
+            <div id="permissionStatus" class="status info" style="margin-top: 10px;">Not requested yet</div>
+        </div>
+
+        <!-- Step 3: Get VAPID Key -->
+        <div class="card">
+            <h2>🔑 Step 3: Fetch VAPID Key</h2>
+            <button onclick="fetchVapidKey()">Fetch VAPID Key</button>
+            <pre id="vapidOutput">Click button to fetch...</pre>
+        </div>
+
+        <!-- Step 4: Create Subscription (Multiple Methods) -->
+        <div class="card">
+            <h2>📝 Step 4: Create & Extract Keys</h2>
+            <button onclick="createAndExtractKeys()">Create Subscription & Extract Keys</button>
+            <button class="secondary" onclick="clearSubscription()">Clear Existing Subscription</button>
+            <pre id="subscriptionOutput">Click button to create subscription...</pre>
+        </div>
+
+        <!-- Step 5: Test Different Extraction Methods -->
+        <div class="card">
+            <h2>🧪 Step 5: Test All Extraction Methods</h2>
+            <button onclick="testAllExtractionMethods()">Test All Methods on Current Subscription</button>
+            <pre id="extractionOutput">Click button to test extraction methods...</pre>
+        </div>
+
+        <!-- Step 6: Send to Server -->
+        <div class="card">
+            <h2>📤 Step 6: Send to Server</h2>
+            <button onclick="sendToServer()">Send Subscription to Server</button>
+            <pre id="serverOutput">Click button to send...</pre>
+        </div>
+
+        <!-- Output for captured subscription -->
+        <div class="card">
+            <h2>💾 Current Subscription Data</h2>
+            <button class="secondary" onclick="showCurrentSubscription()">Show Current Subscription</button>
+            <pre id="currentSubscriptionOutput">No subscription yet...</pre>
+        </div>
+    </div>
+
+    <script>
+        let currentSubscription = null;
+        let currentVapidKey = null;
+
+        // Helper: URL Base64 to Uint8Array
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+            const rawData = atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        }
+
+        // Helper: ArrayBuffer to Base64
+        function arrayBufferToBase64(buffer) {
+            let binary = '';
+            const bytes = new Uint8Array(buffer);
+            for (let i = 0; i < bytes.byteLength; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return btoa(binary);
+        }
+
+        // Step 1: Check Support
+        async function checkSupport() {
+            const output = document.getElementById('supportOutput');
+            output.innerHTML = 'Checking...';
+            
+            const results = {
+                serviceWorker: 'serviceWorker' in navigator,
+                pushManager: 'PushManager' in window,
+                notification: 'Notification' in window,
+                serviceWorkerReady: false
+            };
+            
+            if (results.serviceWorker) {
+                try {
+                    await navigator.serviceWorker.ready;
+                    results.serviceWorkerReady = true;
+                } catch(e) {}
+            }
+            
+            output.innerHTML = JSON.stringify(results, null, 2);
+        }
+
+        // Step 2: Request Permission
+        async function requestPermission() {
+            const statusDiv = document.getElementById('permissionStatus');
+            statusDiv.textContent = 'Requesting permission...';
+            statusDiv.className = 'status info';
+            
+            try {
+                const permission = await Notification.requestPermission();
+                statusDiv.textContent = `Permission: ${permission}`;
+                if (permission === 'granted') {
+                    statusDiv.className = 'status success';
+                } else {
+                    statusDiv.className = 'status error';
+                }
+            } catch (err) {
+                statusDiv.textContent = `Error: ${err.message}`;
+                statusDiv.className = 'status error';
+            }
+        }
+
+        // Step 3: Fetch VAPID Key
+        async function fetchVapidKey() {
+            const output = document.getElementById('vapidOutput');
+            output.innerHTML = 'Fetching...';
+            
+            try {
+                const response = await fetch('/api/notifications?action=get-vapid-key');
+                const data = await response.json();
+                output.innerHTML = JSON.stringify(data, null, 2);
+                if (data.success && data.vapidPublicKey) {
+                    currentVapidKey = data.vapidPublicKey;
+                }
+            } catch (err) {
+                output.innerHTML = `Error: ${err.message}`;
+            }
+        }
+
+        // Step 4: Create Subscription & Extract Keys
+        async function createAndExtractKeys() {
+            const output = document.getElementById('subscriptionOutput');
+            output.innerHTML = 'Creating subscription...\n\n';
+
+            try {
+                // Check permission
+                if (Notification.permission !== 'granted') {
+                    output.innerHTML = '❌ Notification permission not granted. Please click "Request Permission" first.';
+                    return;
+                }
+
+                // Get VAPID key if not already fetched
+                if (!currentVapidKey) {
+                    output.innerHTML += 'Fetching VAPID key...\n';
+                    const vapidRes = await fetch('/api/notifications?action=get-vapid-key');
+                    const vapidData = await vapidRes.json();
+                    if (!vapidData.success) throw new Error('Failed to get VAPID key');
+                    currentVapidKey = vapidData.vapidPublicKey;
+                    output.innerHTML += '✅ VAPID key fetched\n\n';
+                }
+
+                // Register service worker
+                output.innerHTML += 'Registering service worker...\n';
+                let registration;
+                try {
+                    registration = await navigator.serviceWorker.register('/service-worker.js');
+                    await navigator.serviceWorker.ready;
+                    output.innerHTML += '✅ Service worker ready\n\n';
+                } catch (swErr) {
+                    output.innerHTML += `⚠️ Could not register service worker: ${swErr.message}\n`;
+                    output.innerHTML += 'Trying to use existing...\n';
+                    registration = await navigator.serviceWorker.ready;
+                }
+
+                // Create subscription
+                output.innerHTML += 'Creating push subscription...\n';
+                const applicationServerKey = urlBase64ToUint8Array(currentVapidKey);
+                
+                const subscription = await registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: applicationServerKey
+                });
+                
+                currentSubscription = subscription;
+                output.innerHTML += '✅ Subscription created!\n\n';
+                
+                // Now extract keys using all methods
+                output.innerHTML += '=== EXTRACTING KEYS ===\n\n';
+                
+                // Method 1: Direct keys
+                output.innerHTML += 'Method 1 (subscription.keys):\n';
+                if (subscription.keys) {
+                    output.innerHTML += `  ✅ keys object EXISTS\n`;
+                    output.innerHTML += `  p256dh: ${subscription.keys.p256dh ? subscription.keys.p256dh.substring(0, 40) + '...' : '❌ MISSING'}\n`;
+                    output.innerHTML += `  auth: ${subscription.keys.auth ? subscription.keys.auth.substring(0, 40) + '...' : '❌ MISSING'}\n`;
+                } else {
+                    output.innerHTML += `  ❌ keys object is UNDEFINED\n`;
+                }
+                
+                // Method 2: getKey()
+                output.innerHTML += '\nMethod 2 (subscription.getKey()):\n';
+                if (subscription.getKey) {
+                    try {
+                        const p256dhBuffer = subscription.getKey('p256dh');
+                        const authBuffer = subscription.getKey('auth');
+                        output.innerHTML += `  ✅ getKey() method EXISTS\n`;
+                        output.innerHTML += `  p256dh buffer: ${p256dhBuffer ? 'YES (length: ' + p256dhBuffer.byteLength + ')' : 'NO'}\n`;
+                        output.innerHTML += `  auth buffer: ${authBuffer ? 'YES (length: ' + authBuffer.byteLength + ')' : 'NO'}\n`;
+                        if (p256dhBuffer && authBuffer) {
+                            const p256dhBase64 = arrayBufferToBase64(p256dhBuffer);
+                            const authBase64 = arrayBufferToBase64(authBuffer);
+                            output.innerHTML += `  p256dh (base64): ${p256dhBase64.substring(0, 40)}...\n`;
+                            output.innerHTML += `  auth (base64): ${authBase64.substring(0, 40)}...\n`;
+                        }
+                    } catch (err) {
+                        output.innerHTML += `  ❌ Error: ${err.message}\n`;
+                    }
+                } else {
+                    output.innerHTML += `  ❌ getKey() method NOT AVAILABLE\n`;
+                }
+                
+                // Method 3: toJSON()
+                output.innerHTML += '\nMethod 3 (subscription.toJSON()):\n';
+                if (subscription.toJSON) {
+                    try {
+                        const json = subscription.toJSON();
+                        output.innerHTML += `  ✅ toJSON() method EXISTS\n`;
+                        output.innerHTML += `  Has keys: ${json.keys ? 'YES' : 'NO'}\n`;
+                        if (json.keys) {
+                            output.innerHTML += `  p256dh: ${json.keys.p256dh ? json.keys.p256dh.substring(0, 40) + '...' : 'MISSING'}\n`;
+                            output.innerHTML += `  auth: ${json.keys.auth ? json.keys.auth.substring(0, 40) + '...' : 'MISSING'}\n`;
+                        }
+                    } catch (err) {
+                        output.innerHTML += `  ❌ Error: ${err.message}\n`;
+                    }
+                } else {
+                    output.innerHTML += `  ❌ toJSON() method NOT AVAILABLE\n`;
+                }
+                
+                output.innerHTML += '\n✅ Subscription creation complete!';
+                
+            } catch (err) {
+                output.innerHTML += `\n❌ ERROR: ${err.message}\n\nStack: ${err.stack}`;
+            }
+        }
+
+        // Step 5: Test all extraction methods on current subscription
+        async function testAllExtractionMethods() {
+            const output = document.getElementById('extractionOutput');
+            
+            if (!currentSubscription) {
+                output.innerHTML = '❌ No subscription found. Please create one first (Step 4).';
+                return;
+            }
+            
+            output.innerHTML = '=== TESTING ALL EXTRACTION METHODS ===\n\n';
+            
+            // Test Method 1: subscription.keys
+            output.innerHTML += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+            output.innerHTML += '📌 METHOD 1: subscription.keys\n';
+            output.innerHTML += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+            try {
+                if (currentSubscription.keys) {
+                    output.innerHTML += `✅ keys object exists\n`;
+                    output.innerHTML += `p256dh: ${currentSubscription.keys.p256dh || '❌ MISSING'}\n`;
+                    output.innerHTML += `auth: ${currentSubscription.keys.auth || '❌ MISSING'}\n`;
+                    if (currentSubscription.keys.p256dh && currentSubscription.keys.auth) {
+                        output.innerHTML += `\n✅ SUCCESS! This method works.\n`;
+                        output.innerHTML += `\n📋 Copy these keys:\n`;
+                        output.innerHTML += `p256dh: ${currentSubscription.keys.p256dh}\n`;
+                        output.innerHTML += `auth: ${currentSubscription.keys.auth}\n`;
+                    }
+                } else {
+                    output.innerHTML += `❌ keys object is UNDEFINED\n`;
+                }
+            } catch (err) {
+                output.innerHTML += `❌ Error: ${err.message}\n`;
+            }
+            
+            // Test Method 2: getKey()
+            output.innerHTML += '\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+            output.innerHTML += '📌 METHOD 2: getKey()\n';
+            output.innerHTML += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+            try {
+                if (currentSubscription.getKey) {
+                    output.innerHTML += `✅ getKey() method exists\n`;
+                    const p256dhBuffer = currentSubscription.getKey('p256dh');
+                    const authBuffer = currentSubscription.getKey('auth');
+                    output.innerHTML += `p256dh buffer: ${p256dhBuffer ? `YES (${p256dhBuffer.byteLength} bytes)` : 'NO'}\n`;
+                    output.innerHTML += `auth buffer: ${authBuffer ? `YES (${authBuffer.byteLength} bytes)` : 'NO'}\n`;
+                    if (p256dhBuffer && authBuffer) {
+                        const p256dhBase64 = arrayBufferToBase64(p256dhBuffer);
+                        const authBase64 = arrayBufferToBase64(authBuffer);
+                        output.innerHTML += `p256dh (base64): ${p256dhBase64}\n`;
+                        output.innerHTML += `auth (base64): ${authBase64}\n`;
+                        output.innerHTML += `\n✅ SUCCESS! This method works.\n`;
+                    }
+                } else {
+                    output.innerHTML += `❌ getKey() method NOT AVAILABLE\n`;
+                }
+            } catch (err) {
+                output.innerHTML += `❌ Error: ${err.message}\n`;
+            }
+            
+            // Test Method 3: toJSON()
+            output.innerHTML += '\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+            output.innerHTML += '📌 METHOD 3: toJSON()\n';
+            output.innerHTML += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+            try {
+                if (currentSubscription.toJSON) {
+                    output.innerHTML += `✅ toJSON() method exists\n`;
+                    const json = currentSubscription.toJSON();
+                    output.innerHTML += `Full JSON: ${JSON.stringify(json, null, 2)}\n`;
+                    if (json.keys) {
+                        output.innerHTML += `p256dh: ${json.keys.p256dh || 'MISSING'}\n`;
+                        output.innerHTML += `auth: ${json.keys.auth || 'MISSING'}\n`;
+                        output.innerHTML += `\n✅ SUCCESS! This method works.\n`;
+                    }
+                } else {
+                    output.innerHTML += `❌ toJSON() method NOT AVAILABLE\n`;
+                }
+            } catch (err) {
+                output.innerHTML += `❌ Error: ${err.message}\n`;
+            }
+            
+            // Method 4: Object.assign
+            output.innerHTML += '\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+            output.innerHTML += '📌 METHOD 4: Object.assign()\n';
+            output.innerHTML += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+            try {
+                const plain = Object.assign({}, currentSubscription);
+                output.innerHTML += `Plain object keys: ${Object.keys(plain).join(', ')}\n`;
+                output.innerHTML += `Has endpoint: ${!!plain.endpoint}\n`;
+                output.innerHTML += `Has keys: ${!!plain.keys}\n`;
+            } catch (err) {
+                output.innerHTML += `❌ Error: ${err.message}\n`;
+            }
+        }
+
+        // Clear subscription
+        async function clearSubscription() {
+            const output = document.getElementById('subscriptionOutput');
+            output.innerHTML = 'Clearing subscription...\n';
+            
+            try {
+                const registration = await navigator.serviceWorker.ready;
+                const subscription = await registration.pushManager.getSubscription();
+                if (subscription) {
+                    await subscription.unsubscribe();
+                    output.innerHTML += '✅ Subscription cleared!\n';
+                    currentSubscription = null;
+                } else {
+                    output.innerHTML += 'ℹ️ No subscription to clear\n';
+                }
+            } catch (err) {
+                output.innerHTML += `❌ Error: ${err.message}\n`;
+            }
+        }
+
+        // Step 6: Send to Server
+        async function sendToServer() {
+            const output = document.getElementById('serverOutput');
+            
+            if (!currentSubscription) {
+                output.innerHTML = '❌ No subscription found. Please create one first (Step 4).';
+                return;
+            }
+            
+            // Try to extract keys - use getKey() if available
+            let p256dhKey = null;
+            let authKey = null;
+            let methodUsed = '';
+            
+            // Try Method 1: direct keys
+            if (currentSubscription.keys && currentSubscription.keys.p256dh) {
+                p256dhKey = currentSubscription.keys.p256dh;
+                authKey = currentSubscription.keys.auth;
+                methodUsed = 'subscription.keys';
+            }
+            // Try Method 2: getKey()
+            else if (currentSubscription.getKey) {
+                const p256dhBuffer = currentSubscription.getKey('p256dh');
+                const authBuffer = currentSubscription.getKey('auth');
+                if (p256dhBuffer && authBuffer) {
+                    p256dhKey = arrayBufferToBase64(p256dhBuffer);
+                    authKey = arrayBufferToBase64(authBuffer);
+                    methodUsed = 'getKey()';
+                }
+            }
+            // Try Method 3: toJSON()
+            else if (currentSubscription.toJSON) {
+                const json = currentSubscription.toJSON();
+                if (json.keys && json.keys.p256dh && json.keys.auth) {
+                    p256dhKey = json.keys.p256dh;
+                    authKey = json.keys.auth;
+                    methodUsed = 'toJSON()';
+                }
+            }
+            
+            if (!p256dhKey || !authKey) {
+                output.innerHTML = '❌ Could not extract keys from subscription using any method!\n\n';
+                output.innerHTML += 'Please check Step 5 to see which extraction method works on your browser.';
+                return;
+            }
+            
+            output.innerHTML = `Extracted keys using: ${methodUsed}\n`;
+            output.innerHTML += `p256dh: ${p256dhKey.substring(0, 40)}...\n`;
+            output.innerHTML += `auth: ${authKey.substring(0, 40)}...\n\n`;
+            output.innerHTML += 'Sending to server...\n';
+            
+            // Get auth token
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                output.innerHTML += '\n⚠️ Not logged in. Please login to the app first.\n';
+                output.innerHTML += 'The subscription will be saved when you login.';
+                return;
+            }
+            
+            // Create clean subscription object
+            const cleanSubscription = {
+                endpoint: currentSubscription.endpoint,
+                keys: {
+                    p256dh: p256dhKey,
+                    auth: authKey
+                }
+            };
+            
+            try {
+                const response = await fetch('/api/notifications?action=subscribe', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(cleanSubscription)
+                });
+                
+                const data = await response.json();
+                output.innerHTML += `\nServer response: ${JSON.stringify(data, null, 2)}`;
+                
+                if (data.success) {
+                    output.innerHTML += '\n\n✅ Subscription saved to server successfully!';
+                }
+            } catch (err) {
+                output.innerHTML += `\n❌ Error: ${err.message}`;
+            }
+        }
+
+        // Show current subscription
+        async function showCurrentSubscription() {
+            const output = document.getElementById('currentSubscriptionOutput');
+            
+            if (!currentSubscription) {
+                output.innerHTML = 'No subscription in memory. Please create one first (Step 4).';
+                return;
+            }
+            
+            output.innerHTML = JSON.stringify({
+                endpoint: currentSubscription.endpoint,
+                hasKeys: !!currentSubscription.keys,
+                hasGetKey: !!currentSubscription.getKey,
+                hasToJSON: !!currentSubscription.toJSON
+            }, null, 2);
+        }
+    </script>
+</body>
+</html>
