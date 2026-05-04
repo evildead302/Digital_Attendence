@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>Attendance Diary</title>
+    <script>window.VAPID_PUBLIC_KEY = '%VAPID_PUBLIC_KEY%';</script>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- Debug Panel Styles -->
+    <style>
+        #debugPanel {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            padding: 10px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 11px;
+            max-width: 300px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 9999;
+            border: 2px solid #4CAF50;
+            display: none;
+        }
+        
+        #debugToggle {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+            cursor: pointer;
+            z-index: 10000;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        
+        .debug-log {
+            margin: 2px 0;
+            padding: 2px;
+            border-bottom: 1px solid #333;
+            font-size: 10px;
+        }
+        
+        .debug-success { color: #4CAF50; }
+        .debug-error { color: #f44336; }
+        .debug-warning { color: #ff9800; }
+        .debug-info { color: #2196F3; }
+        
+        #debugHeader {
+            background: #333;
+            padding: 5px;
+            margin: -10px -10px 10px -10px;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        #debugClear {
+            background: #666;
+            color: white;
+            border: none;
+            padding: 2px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 10px;
+        }
+
+        /* Load Status Bar - More Detailed */
+        #loadStatus {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #1a1a2e;
+            color: white;
+            padding: 8px;
+            font-size: 10px;
+            text-align: center;
+            z-index: 10001;
+            font-family: monospace;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        .load-step {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+        .load-step.pending { background: #555; color: #aaa; }
+        .load-step.loading { background: #ff9800; color: #000; animation: pulse 1s infinite; }
+        .load-step.done { background: #4caf50; color: white; }
+        .load-step.error { background: #f44336; color: white; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        #loadTime { background: #333; padding: 3px 8px; border-radius: 4px; font-family: monospace; }
+        
+        /* Syntax Error Display */
+        #syntaxError {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #fff3f3;
+            border-left: 5px solid #f44336;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            z-index: 10002;
+            max-width: 90%;
+            display: none;
+            font-family: monospace;
+        }
+        #syntaxError pre {
+            background: #f5f5f5;
+            padding: 10px;
+            overflow-x: auto;
+            font-size: 11px;
+            margin-top: 10px;
+        }
+
+        /* Toggle Switch Styles for Alarm */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 52px;
+            height: 28px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: 0.3s;
+            border-radius: 28px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+
+        .alarm-section {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .alarm-toggle-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .alarm-time-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .alarm-time-row label {
+            font-size: 14px;
+            color: #666;
+            min-width: 100px;
+        }
+
+        .alarm-time-row input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .save-alarm-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 15px;
+            transition: transform 0.2s;
+        }
+
+        .save-alarm-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .alarm-status {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+            margin-bottom: 15px;
+        }
+
+        .alarm-status-label {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .target-time-display {
+            font-size: 20px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .target-calculation {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .notification-status {
+            margin-top: 15px;
+            font-size: 12px;
+            color: #999;
+            text-align: center;
+        }
+
+        .enable-notif-btn {
+            background: none;
+            border: none;
+            color: #667eea;
+            cursor: pointer;
+            margin-left: 8px;
+            font-size: 12px;
+        }
+
+        .enable-notif-btn:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <!-- Load Status Bar - Shows where app.js is stuck -->
+    <div id="loadStatus">
+        <span>📱 App Load:</span>
+        <span id="stepFetch" class="load-step pending">Fetching</span>
+        <span>→</span>
+        <span id="stepParse" class="load-step pending">Parsing</span>
+        <span>→</span>
+        <span id="stepExecute" class="load-step pending">Executing</span>
+        <span>→</span>
+        <span id="stepReady" class="load-step pending">Ready</span>
+        <span id="loadTime"></span>
+        <span id="fileSize"></span>
+    </div>
+
+    <!-- Syntax Error Display -->
+    <div id="syntaxError">
+        <strong>❌ JavaScript Syntax Error Detected!</strong>
+        <div id="syntaxErrorMsg"></div>
+        <pre id="syntaxErrorStack"></pre>
+        <button onclick="document.getElementById('syntaxError').style.display='none'">Close</button>
+    </div>
+
+    <!-- Debug Toggle -->
+    <button id="debugToggle" onclick="toggleDebug()">🔍</button>
+    
+    <!-- Debug Panel -->
+    <div id="debugPanel">
+        <div id="debugHeader">
+            <strong>📊 DEBUG PANEL</strong>
+            <button id="debugClear" onclick="clearDebugLogs()">Clear</button>
+        </div>
+        <div id="debugLogs"></div>
+    </div>
+
+    <!-- ==================== LOGIN PAGE ==================== -->
+    <div id="loginScreen">
+        <div class="login-container">
+            <div class="logo">📒</div>
+            <h1>Welcome Back</h1>
+            
+            <div class="login-form">
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="loginEmail" placeholder="Enter your email">
+                </div>
+                
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="loginPassword" placeholder="Enter your password">
+                </div>
+                
+                <button onclick="safeLogin()" class="login-btn" id="loginBtn">Login</button>
+                
+                <div class="register-link">
+                    Don't have an account? <a href="#" onclick="showRegister()">Register</a>
+                </div>
+
+                <!-- Forgot Password Link -->
+                <div style="text-align: center; margin-top: 15px;">
+                    <a href="#" onclick="showForgotPassword()" style="color: #667eea; text-decoration: none; font-size: 14px;">Forgot Password?</a>
+                </div>
+                
+                <div id="loginError" class="error-message"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== REGISTER PAGE ==================== -->
+    <div id="registerScreen" style="display: none;">
+        <div class="login-container">
+            <div class="logo">📒</div>
+            <h1>Create Account</h1>
+            
+            <div class="login-form">
+                <div class="input-group">
+                    <label>Name</label>
+                    <input type="text" id="registerName" placeholder="Full Name">
+                </div>
+                
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="registerEmail" placeholder="Email">
+                </div>
+                
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="registerPassword" placeholder="Min 6 characters">
+                </div>
+                
+                <button onclick="register()" class="login-btn">Register</button>
+                
+                <div class="register-link">
+                    Already have an account? <a href="#" onclick="showLogin()">Login</a>
+                </div>
+                
+                <div id="registerError" class="error-message"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MAIN APP ==================== -->
+    <div id="appScreen" style="display: none;">
+        <!-- Navigation Tabs -->
+        <div class="nav-tabs">
+            <button class="tab-btn active" onclick="switchTab('home')">Home</button>
+            <button class="tab-btn" onclick="switchTab('schedule')">Schedule</button>
+            <button class="tab-btn" onclick="switchTab('history')">History</button>
+            <button class="tab-btn" onclick="switchTab('balance')">Balance</button>
+            <button class="tab-btn" onclick="switchTab('settings')">Settings</button>
+            <button class="tab-btn logout-btn" onclick="logout()">Logout</button>
+        </div>
+
+        <!-- ========== HOME TAB ========== -->
+        <div id="homeTab" class="tab-pane active">
+            <!-- Top Bar with Time -->
+            <div class="home-top-bar">
+                <div class="home-time-container">
+                    <span class="home-time" id="homeTime">10:43</span>
+                    <span class="home-time-period" id="homePeriod">AM</span>
+                </div>
+                <div class="home-date" id="homeDate">WED, FEB 25</div>
+            </div>
+
+            <!-- Professional Entry Options Section -->
+            <div class="entry-options-section">
+                <div class="entry-options-header" onclick="toggleEntryOptions()">
+                    <span class="entry-options-title">📝 Previous Entries</span>
+                    <span class="entry-options-toggle" id="entryToggle">▼</span>
+                </div>
+                
+                <div id="entryOptions" class="entry-options" style="display: none;">
+                    <button onclick="showManualEntry()" class="entry-option-btn single-entry">
+                        <span class="btn-icon">📅</span>
+                        <div class="btn-content">
+                            <span class="btn-text">Single Date Entry</span>
+                            <span class="btn-desc">Add or edit one specific date</span>
+                        </div>
+                    </button>
+                    
+                    <button onclick="showBulkManualEntry()" class="entry-option-btn bulk-entry">
+                        <span class="btn-icon">📆</span>
+                        <div class="btn-content">
+                            <span class="btn-text">Bulk Date Range Entry</span>
+                            <span class="btn-desc">Apply the same entry to multiple dates</span>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Check In/Out Cards -->
+            <div class="check-cards">
+                <div class="check-card check-in" onclick="checkIn()">
+                    <div class="check-time" id="checkInDisplay">--:--</div>
+                    <div class="check-label">CHECK-IN</div>
+                </div>
+                <div class="check-card check-out" onclick="checkOut()">
+                    <div class="check-time" id="checkOutDisplay">--:--</div>
+                    <div class="check-label">CHECK-OUT</div>
+                </div>
+            </div>
+
+            <!-- Leave Buttons Grid -->
+            <div class="leave-grid">
+                <button class="leave-btn annual" onclick="markLeave('annual')">ANNUAL</button>
+                <button class="leave-btn sick" onclick="markLeave('sick')">SICK</button>
+                <button class="leave-btn offday" onclick="markOffDay()">OFF-DAY</button>
+                <button class="leave-btn casual" onclick="markLeave('casual')">CASUAL</button>
+                <button class="leave-btn cpl" onclick="markLeave('cpl')">CPL</button>
+            </div>
+
+            <!-- Sync Buttons -->
+            <div class="sync-buttons">
+                <button class="sync-btn sync-in" onclick="syncFromCloud()">
+                    <span class="sync-icon">🔄</span>
+                    SYNC IN
+                </button>
+                <button class="sync-btn sync-out" onclick="syncToCloud()">
+                    <span class="sync-icon">⬆️</span>
+                    SYNC OUT
+                </button>
+            </div>
+
+            <!-- Last Sync Time -->
+            <div class="last-sync" id="lastSyncTime">Last sync: --:--</div>
+
+            <!-- ========== DAILY ALARM & NOTIFICATION SETTINGS ========== -->
+            <div class="alarm-section">
+                <h3 style="font-size: 16px; margin-bottom: 12px; color: #333;">⏰ Daily Alarm & Notifications</h3>
+                
+                <!-- Alarm Toggle -->
+                <div class="alarm-toggle-row">
+                    <label style="font-size: 14px; color: #666;">Enable Check-In Reminders</label>
+                    <label class="switch">
+                        <input type="checkbox" id="alarmEnabled">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                
+                <!-- Check-In Time Input -->
+                <div class="alarm-time-row">
+                    <label>Daily Check-In Time:</label>
+                    <input type="time" id="checkinAlarmTime" value="09:00">
+                </div>
+                
+                <!-- Save Button -->
+                <button onclick="saveAlarmSettings()" class="save-alarm-btn">
+                    💾 Save Alarm Settings
+                </button>
+                
+                <!-- Status Line - Target Time Calculation -->
+                <div class="alarm-status">
+                    <div class="alarm-status-label">📊 Target Check-Out Time:</div>
+                    <div class="target-time-display" id="targetTimeDisplay">--:--</div>
+                    <div class="target-calculation" id="targetCalculation">Loading...</div>
+                </div>
+                
+                <!-- Notification Permission Status -->
+                <div class="notification-status">
+                    <span id="notifStatus">📢 Notifications: Not enabled</span>
+                    <button onclick="requestNotificationPermission()" class="enable-notif-btn">Enable</button>
+                </div>
+            </div>
+
+            <!-- Manual Entry Modal (Single) -->
+            <div id="manualEntryModal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <h3>📅 Single Date Entry</h3>
+                    <input type="date" id="manualDate" class="modal-input">
+                    <input type="time" id="manualIn" class="modal-input" placeholder="Check In">
+                    <input type="time" id="manualOut" class="modal-input" placeholder="Check Out">
+                    <select id="manualType" class="modal-input">
+                        <option value="work">Work Day</option>
+                        <option value="annual">Annual Leave</option>
+                        <option value="sick">Sick Leave</option>
+                        <option value="casual">Casual Leave</option>
+                        <option value="cpl">CPL</option>
+                        <option value="holiday">Holiday</option>
+                        <option value="off">Off Day</option>
+                    </select>
+                    <div class="modal-buttons">
+                        <button onclick="saveManualEntry()" class="modal-save">Save Entry</button>
+                        <button onclick="closeManualEntry()" class="modal-cancel">Cancel</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bulk Manual Entry Modal -->
+            <div id="bulkManualModal" class="modal" style="display: none;">
+                <div class="modal-content" style="max-width: 450px;">
+                    <h3>📆 Bulk Date Range Entry</h3>
+                    <p style="color: #666; margin-bottom: 15px;">Apply the same entry to multiple dates</p>
+                    
+                    <div class="filter-row">
+                        <label>FROM:</label>
+                        <input type="date" id="bulkFromDate" class="modal-input">
+                    </div>
+                    <div class="filter-row">
+                        <label>TO:</label>
+                        <input type="date" id="bulkToDate" class="modal-input">
+                    </div>
+                    
+                    <div class="filter-row">
+                        <label>Check In:</label>
+                        <input type="time" id="bulkCheckIn" class="modal-input">
+                    </div>
+                    <div class="filter-row">
+                        <label>Check Out:</label>
+                        <input type="time" id="bulkCheckOut" class="modal-input">
+                    </div>
+                    
+                    <div class="filter-row">
+                        <label>Type:</label>
+                        <select id="bulkType" class="modal-input">
+                            <option value="work">Work Day</option>
+                            <option value="annual">Annual Leave</option>
+                            <option value="sick">Sick Leave</option>
+                            <option value="casual">Casual Leave</option>
+                            <option value="cpl">CPL</option>
+                            <option value="holiday">Holiday</option>
+                            <option value="off">Off Day</option>
+                        </select>
+                    </div>
+                    
+                    <div id="bulkProgress" class="progress-bar" style="display: none;"></div>
+                    
+                    <div class="modal-buttons">
+                        <button onclick="saveBulkManualEntry()" class="modal-save">Apply to Range</button>
+                        <button onclick="closeBulkManualEntry()" class="modal-cancel">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== SCHEDULE TAB ========== -->
+        <div id="scheduleTab" class="tab-pane">
+            <h2>Schedule</h2>
+            
+            <!-- Weekly Template -->
+            <div class="schedule-section">
+                <h3>Weekly Template</h3>
+                <div class="template-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Day</th>
+                                <th>Base</th>
+                                <th class="ot-col">OT Cap</th>
+                                <th class="cpl-col">CPL</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Monday</td><td><input type="number" id="monBase" value="8" step="0.5"></td><td class="ot-col"><input type="number" id="monOT" value="1" step="0.5"></td><td class="cpl-col"><input type="number" id="monCPL" value="0" step="0.5"></td></tr>
+                            <tr><td>Tuesday</td><td><input type="number" id="tueBase" value="8" step="0.5"></td><td class="ot-col"><input type="number" id="tueOT" value="1" step="0.5"></td><td class="cpl-col"><input type="number" id="tueCPL" value="0" step="0.5"></td></tr>
+                            <tr><td>Wednesday</td><td><input type="number" id="wedBase" value="8" step="0.5"></td><td class="ot-col"><input type="number" id="wedOT" value="1" step="0.5"></td><td class="cpl-col"><input type="number" id="wedCPL" value="0" step="0.5"></td></tr>
+                            <tr><td>Thursday</td><td><input type="number" id="thuBase" value="8" step="0.5"></td><td class="ot-col"><input type="number" id="thuOT" value="1" step="0.5"></td><td class="cpl-col"><input type="number" id="thuCPL" value="0" step="0.5"></td></tr>
+                            <tr><td>Friday</td><td><input type="number" id="friBase" value="8.5" step="0.5"></td><td class="ot-col"><input type="number" id="friOT" value="1" step="0.5"></td><td class="cpl-col"><input type="number" id="friCPL" value="0" step="0.5"></td></tr>
+                            <tr><td>Saturday</td><td><input type="number" id="satBase" value="8" step="0.5"></td><td class="ot-col"><input type="number" id="satOT" value="1" step="0.5"></td><td class="cpl-col"><input type="number" id="satCPL" value="1" step="0.5"></td></tr>
+                            <tr><td>1st,3rd,5th Sunday</td><td><input type="number" id="sunOddBase" value="8" step="0.5"></td><td class="ot-col"><input type="number" id="sunOddOT" value="0" step="0.5"></td><td class="cpl-col"><input type="number" id="sunOddCPL" value="1.0" step="0.5"></td></tr>
+                            <tr><td>2nd,4th Sunday</td><td><input type="number" id="sunEvenBase" value="6" step="0.5"></td><td class="ot-col"><input type="number" id="sunEvenOT" value="0" step="0.5"></td><td class="cpl-col"><input type="number" id="sunEvenCPL" value="0.5" step="0.5"></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <button onclick="saveTemplate()" class="save-template-btn">Save Template</button>
+            </div>
+
+            <!-- Single Date Override -->
+            <div class="schedule-section">
+                <h3>Single Date Override</h3>
+                <button onclick="showSingleDateOverride()" class="single-override-btn">➕ Add Single Date Rule</button>
+            </div>
+
+            <!-- Apply to Date Range -->
+            <div class="schedule-section">
+                <h3>Apply to Date Range</h3>
+                <div class="date-range">
+                    <input type="date" id="rangeFrom" class="range-input">
+                    <span>to</span>
+                    <input type="date" id="rangeTo" class="range-input">
+                </div>
+                <button onclick="applyTemplateToRange()" class="apply-range-btn">Apply to Range</button>
+            </div>
+        </div>
+
+        <!-- ========== HISTORY TAB ========== -->
+        <div id="historyTab" class="tab-pane">
+            <h2>History & Search</h2>
+            <div class="history-filters">
+                <div class="filter-row"><label>FROM:</label><input type="date" id="historyFrom"></div>
+                <div class="filter-row"><label>TO:</label><input type="date" id="historyTo"></div>
+                <button onclick="applyDateRange()" class="apply-range-btn">🔍 Apply Date Range</button>
+            </div>
+            <div class="filter-buttons">
+                <button class="filter-btn active" onclick="filterHistory('all')">ALL</button>
+                <button class="filter-btn" onclick="filterHistory('ot')">OT</button>
+                <button class="filter-btn" onclick="filterHistory('cpl')">CPL</button>
+                <button class="filter-btn" onclick="filterHistory('leave')">LEAVE</button>
+            </div>
+            <div id="historyList" class="history-list"></div>
+        </div>
+
+        <!-- ========== BALANCE TAB ========== -->
+        <div id="balanceTab" class="tab-pane">
+            <h2>Balance</h2>
+            <div class="balance-card al-card"><div class="balance-label">AL Balance (FIFO)</div><div class="balance-value" id="alBalance">0.00</div><div class="balance-unit">days</div><div class="balance-note" id="alBalanceNote">-- days carry forward per year</div></div>
+            <div class="balance-card sl-card"><div class="balance-label">SL Balance</div><div class="balance-value" id="slBalance">10.0</div><div class="balance-unit">days</div><div class="balance-note">Resets Jan 1st</div></div>
+            <div class="balance-card cl-card"><div class="balance-label">CL Balance</div><div class="balance-value" id="clBalance">10.0</div><div class="balance-unit">days</div><div class="balance-note">Resets Jan 1st</div></div>
+            <div class="balance-card cpl-card"><div class="balance-label">CPL Balance (FIFO)</div><div class="balance-value" id="cplBalance">0.00</div><div class="balance-unit">days</div><div class="balance-note">180 days expiry</div></div>
+            <div class="expiry-section"><h3>📅 Expiring Soon</h3><div id="alExpiryInfo" class="expiry-info"></div><div id="cplExpiryInfo" class="expiry-info"></div></div>
+            <div class="ot-card"><div class="ot-label">OT This Month</div><div class="ot-value" id="otMonth">0.0</div><div class="ot-unit">Hours</div></div>
+            <div class="ot-card" style="background: linear-gradient(135deg, #ff9800, #f57c00);"><div class="ot-label">OT Last Month</div><div class="ot-value" id="otLastMonth">0.0</div><div class="ot-unit">Hours</div></div>
+            <button onclick="recalculateAll()" class="recalc-btn">RECALCULATE ALL</button>
+        </div>
+
+        <!-- ========== SETTINGS TAB ========== -->
+        <div id="settingsTab" class="tab-pane">
+            <h2>Settings</h2>
+            
+            <div class="settings-section collapsible">
+                <div class="collapsible-header"><h3>👤 Account Settings</h3><span class="collapse-icon">▼</span></div>
+                <div class="collapsible-content">
+                    <div class="user-info"><p><strong>Email:</strong> <span id="settingsUserEmail"></span></p><p><strong>User ID:</strong> <span id="settingsUserID"></span></p></div>
+                    <div class="button-group"><button onclick="showChangePasswordModal()" class="secondary-btn">🔑 Change Password</button><button onclick="showDeleteAccountModal()" class="danger-btn">🗑️ Delete Account</button></div>
+                </div>
+            </div>
+
+            <div class="settings-section collapsible">
+                <div class="collapsible-header"><h3>📤 Export Data</h3><span class="collapse-icon">▼</span></div>
+                <div class="collapsible-content">
+                    <p>Export your attendance data to CSV format.</p>
+                    <div class="setup-row"><label>Select Year:</label><select id="exportYear"></select><button onclick="exportAttendanceToCSV(document.getElementById('exportYear').value)" class="primary-btn">📥 Export to CSV</button></div>
+                </div>
+            </div>
+
+            <div class="settings-section collapsible">
+                <div class="collapsible-header"><h3>⚙️ Feature Toggles</h3><span class="collapse-icon">▼</span></div>
+                <div class="collapsible-content">
+                    <div class="setup-row"><label>🔧 Overtime (OT):</label><button id="otToggleBtn" class="toggle-btn" style="background:#4caf50;color:white;">✅ OT Enabled</button></div>
+                    <div class="setup-row"><label>🎁 Compensatory Leave (CPL):</label><button id="cplToggleBtn" class="toggle-btn" style="background:#4caf50;color:white;">✅ CPL Enabled</button></div>
+                </div>
+            </div>
+
+            <div class="settings-section collapsible">
+                <div class="collapsible-header"><h3>⚙️ App Customization</h3><span class="collapse-icon">▼</span></div>
+                <div class="collapsible-content">
+                    <div class="setup-row"><label>Enable OT:</label><input type="checkbox" id="userHasOT"></div>
+                    <div class="setup-row"><label>Enable CPL:</label><input type="checkbox" id="userHasCPL"></div>
+                    <div style="margin:15px 0;border-top:1px solid #e0e0e0;"></div>
+                    <div class="setup-row"><label>Annual Leave Limit:</label><input type="number" id="userLimitAnnual" value="22" step="1" min="0" style="width:100px;"></div>
+                    <div class="setup-row"><label>Casual Leave Limit:</label><input type="number" id="userLimitCasual" value="10" step="1" min="0" style="width:100px;"></div>
+                    <div class="setup-row"><label>Sick Leave Limit:</label><input type="number" id="userLimitSick" value="10" step="1" min="0" style="width:100px;"></div>
+                    <div class="setup-actions"><button onclick="saveUserSettingsAndApply()" class="primary-btn">💾 Save</button><button onclick="resetUserSettingsToDefault()" class="secondary-btn">↺ Reset</button></div>
+                    <div id="settingsSaveStatus"></div>
+                </div>
+            </div>
+
+            <div class="settings-section collapsible">
+                <div class="collapsible-header"><h3>📊 Balance Adjustments</h3><span class="collapse-icon">▼</span></div>
+                <div class="collapsible-content">
+                    <button onclick="showBalanceAdjustmentModal()" class="balance-adjustment-btn">⚖️ Add Balance Adjustment</button>
+                    <div class="adjustment-list" id="adjustmentList"></div>
+                </div>
+            </div>
+
+            <div class="settings-section collapsible">
+                <div class="collapsible-header"><h3>📊 Initial Balance Setup</h3><span class="collapse-icon">▼</span></div>
+                <div class="collapsible-content">
+                    <div class="balance-setup-grid">
+                        <div class="setup-row"><label>AL:</label><input type="number" id="setupAL" value="0" step="0.01"></div>
+                        <div class="setup-row"><label>SL:</label><input type="number" id="setupSL" value="10.0" step="0.01"></div>
+                        <div class="setup-row"><label>CL:</label><input type="number" id="setupCL" value="10.0" step="0.01"></div>
+                        <div class="setup-row"><label>CPL:</label><input type="number" id="setupCPL" value="0" step="0.01"></div>
+                        <div class="setup-row"><label>OT:</label><input type="number" id="setupOT" value="0" step="0.5"></div>
+                    </div>
+                    <div class="setup-actions"><button onclick="showInitialBalanceModal()" class="primary-btn">Set Initial Balances</button><button onclick="resetAllData()" class="danger-btn">⚠️ Reset All Data</button></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals (abbreviated for brevity) -->
+    <div id="singleDateModal" class="modal" style="display:none;"><div class="modal-content"><h3>Single Date Override</h3><input type="date" id="singleDate"><select id="singleType"><option value="work">Work Day</option><option value="holiday">Holiday</option><option value="off">Off Day</option></select><input type="number" id="singleBase" placeholder="Base Hours"><input type="number" id="singleOT" placeholder="OT Cap"><input type="number" id="singleCPL" placeholder="CPL Grant"><div class="modal-buttons"><button onclick="saveSingleDateOverride()">Save</button><button onclick="closeSingleDateOverride()">Cancel</button></div></div></div>
+    <div id="initialBalanceModal" class="modal" style="display:none;"><div class="modal-content"><h3>Set Initial Balances</h3><input type="date" id="initialDate"><input type="number" id="initialAL" placeholder="AL"><input type="number" id="initialSL" placeholder="SL"><input type="number" id="initialCL" placeholder="CL"><input type="number" id="initialCPL" placeholder="CPL"><input type="number" id="initialOT" placeholder="OT"><div class="modal-buttons"><button onclick="saveInitialBalances()">Save</button><button onclick="closeInitialBalanceModal()">Cancel</button></div></div></div>
+    <div id="balanceAdjustmentModal" class="modal" style="display:none;"><div class="modal-content"><h3>Add Balance Adjustment</h3><input type="date" id="adjustmentDate"><input type="number" id="adjustmentAL" placeholder="AL"><input type="number" id="adjustmentSL" placeholder="SL"><input type="number" id="adjustmentCL" placeholder="CL"><input type="number" id="adjustmentCPL" placeholder="CPL"><input type="number" id="adjustmentOT" placeholder="OT"><input type="text" id="adjustmentNote" placeholder="Note"><div class="modal-buttons"><button onclick="saveBalanceAdjustment()">Save</button><button onclick="closeBalanceAdjustmentModal()">Cancel</button></div></div></div>
+    <div id="changePasswordModal" class="modal" style="display:none;"><div class="modal-content"><h3>Change Password</h3><input type="password" id="currentPassword" placeholder="Current"><input type="password" id="newPassword" placeholder="New"><input type="password" id="confirmPassword" placeholder="Confirm"><div id="passwordError"></div><div class="modal-buttons"><button onclick="changePassword()">Change</button><button onclick="closeChangePasswordModal()">Cancel</button></div></div></div>
+    <div id="deleteAccountModal" class="modal" style="display:none;"><div class="modal-content"><h3>Delete Account</h3><input type="text" id="deleteConfirm" placeholder="Type DELETE"><div id="deleteError"></div><div class="modal-buttons"><button onclick="deleteAccount()">Delete</button><button onclick="closeDeleteAccountModal()">Cancel</button></div></div></div>
+    <div id="otpModal" class="modal" style="display:none;"><div class="modal-content"><h3>Verify Email</h3><div><span id="appEmailDisplay"></span><button onclick="copyToClipboard('appEmailDisplay')">Copy</button></div><div><span id="otpCodeDisplay"></span><button onclick="copyToClipboard('otpCodeDisplay')">Copy</button></div><div>Time: <span id="otpTimer"></span></div><button onclick="openMailClient()">Open Email</button><div class="modal-buttons"><button onclick="verifyOTP()">Verify</button><button onclick="closeOTPModal()">Cancel</button></div><div id="otpError"></div></div></div>
+
+    <script src="db.js"></script>
+    <script src="app.js"></script>
+    
+    <script>
+        // ADVANCED DEBUGGING - Track exactly where app.js fails
+        let loadStartTime = Date.now();
+        let loadStage = 'starting';
+        
+        function updateLoadStage(stage, status, detail = '') {
+            loadStage = stage;
+            const element = document.getElementById('step' + stage);
+            if (element) {
+                element.className = 'load-step ' + status;
+                if (detail) element.title = detail;
+            }
+            const elapsed = ((Date.now() - loadStartTime) / 1000).toFixed(1);
+            document.getElementById('loadTime').innerHTML = `⏱️ ${elapsed}s`;
+            
+            // Also log to console
+            console.log(`[LOAD] ${stage}: ${status} ${detail ? '('+detail+')' : ''} at ${elapsed}s`);
+            
+            // Check if stuck
+            if (status === 'loading' && elapsed > 15) {
+                document.getElementById('syntaxErrorMsg').innerHTML = `App is stuck at "${stage}" stage after ${elapsed} seconds.`;
+                document.getElementById('syntaxErrorStack').innerHTML = `This usually means:<br>
+1. The JavaScript file is too large and timing out<br>
+2. There's a syntax error that crashes execution<br>
+3. An infinite loop or heavy computation is blocking<br><br>
+Check the browser console (F12) for detailed error messages.`;
+                document.getElementById('syntaxError').style.display = 'block';
+            }
+        }
+        
+        window.debugLogs = [];
+        
+        window.addDebugLog = function(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            window.debugLogs.push({ time: timestamp, message, type });
+            const debugLogsDiv = document.getElementById('debugLogs');
+            if (debugLogsDiv && debugLogsDiv.children.length < 100) {
+                const logDiv = document.createElement('div');
+                logDiv.className = `debug-log debug-${type}`;
+                logDiv.innerHTML = `<span style="color:#888">[${timestamp}]</span> ${message}`;
+                debugLogsDiv.appendChild(logDiv);
+                debugLogsDiv.scrollTop = debugLogsDiv.scrollHeight;
+            }
+            console.log(`[${type}] ${message}`);
+        };
+        
+        window.toggleDebug = function() {
+            const panel = document.getElementById('debugPanel');
+            panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+        };
+        
+        window.clearDebugLogs = function() {
+            window.debugLogs = [];
+            const debugLogsDiv = document.getElementById('debugLogs');
+            if (debugLogsDiv) debugLogsDiv.innerHTML = '';
+        };
+        
+        // Track script loading
+        updateLoadStage('Fetch', 'loading');
+        
+        // Check file size first
+        fetch('/app.js', { method: 'HEAD' })
+            .then(r => {
+                const size = r.headers.get('content-length');
+                if (size) {
+                    const sizeKB = (parseInt(size) / 1024).toFixed(0);
+                    document.getElementById('fileSize').innerHTML = `📦 ${sizeKB}KB`;
+                    if (parseInt(size) > 500000) {
+                        addDebugLog(`⚠️ WARNING: app.js is ${sizeKB}KB - very large for mobile!`, 'warning');
+                        updateLoadStage('Fetch', 'error', `File too large: ${sizeKB}KB`);
+                    } else {
+                        updateLoadStage('Fetch', 'done');
+                    }
+                } else {
+                    updateLoadStage('Fetch', 'done');
+                }
+            })
+            .catch(e => {
+                addDebugLog(`❌ Cannot fetch app.js: ${e.message}`, 'error');
+                updateLoadStage('Fetch', 'error', 'File not found');
+            });
+        
+        // Monitor window for when app.js functions become available
+        let functionCheckInterval = setInterval(() => {
+            const elapsed = (Date.now() - loadStartTime) / 1000;
+            
+            // Track which functions are available
+            const functions = {
+                login: typeof login === 'function',
+                register: typeof register === 'function',
+                syncFromCloud: typeof syncFromCloud === 'function',
+                syncToCloud: typeof syncToCloud === 'function',
+                checkAuth: typeof checkAuth === 'function'
+            };
+            
+            const allLoaded = functions.login && functions.register;
+            
+            if (allLoaded) {
+                addDebugLog(`✅ All functions loaded after ${elapsed.toFixed(1)} seconds`, 'success');
+                addDebugLog(`  - login: ${functions.login}`, 'debug');
+                addDebugLog(`  - register: ${functions.register}`, 'debug');
+                addDebugLog(`  - syncFromCloud: ${functions.syncFromCloud}`, 'debug');
+                updateLoadStage('Ready', 'done');
+                clearInterval(functionCheckInterval);
+                
+                // Enable login button
+                const loginBtn = document.getElementById('loginBtn');
+                if (loginBtn) {
+                    loginBtn.disabled = false;
+                    loginBtn.textContent = 'Login';
+                }
+                document.getElementById('loginError').textContent = '';
+            } else if (elapsed > 20) {
+                addDebugLog(`❌ Functions not loaded after ${elapsed.toFixed(1)} seconds!`, 'error');
+                addDebugLog(`  - login: ${functions.login}`, 'debug');
+                addDebugLog(`  - register: ${functions.register}`, 'debug');
+                updateLoadStage('Ready', 'error', 'Timeout - functions not loaded');
+                document.getElementById('loginError').textContent = 'App failed to load. Please refresh or check your connection.';
+                clearInterval(functionCheckInterval);
+            } else if (elapsed > 5) {
+                // Show partial progress
+                if (functions.login) updateLoadStage('Execute', 'done');
+                else updateLoadStage('Execute', 'loading');
+            }
+        }, 500);
+        
+        function safeLogin() {
+            addDebugLog('safeLogin() called', 'info');
+            if (typeof login === 'function') {
+                addDebugLog('Calling login()', 'success');
+                login();
+            } else {
+                addDebugLog('Login function not ready', 'warning');
+                document.getElementById('loginError').textContent = 'App still loading. Please wait a moment and try again.';
+                setTimeout(() => {
+                    if (typeof login === 'function') {
+                        login();
+                    } else {
+                        document.getElementById('loginError').textContent = 'System not ready. Please refresh the page.';
+                    }
+                }, 2000);
+            }
+        }
+        
+        function toggleEntryOptions() {
+            const options = document.getElementById('entryOptions');
+            const toggle = document.getElementById('entryToggle');
+            if (options.style.display === 'none' || !options.style.display) {
+                options.style.display = 'flex';
+                if (toggle) toggle.textContent = '▲';
+            } else {
+                options.style.display = 'none';
+                if (toggle) toggle.textContent = '▼';
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            addDebugLog('DOMContentLoaded fired', 'success');
+            document.getElementById('debugPanel').style.display = 'block';
+            
+            const exportYear = document.getElementById('exportYear');
+            if (exportYear) {
+                const currentYear = new Date().getFullYear();
+                for (let y = currentYear - 5; y <= currentYear + 1; y++) {
+                    const option = document.createElement('option');
+                    option.value = y;
+                    option.textContent = y;
+                    exportYear.appendChild(option);
+                }
+                exportYear.value = currentYear;
+            }
+        });
+        
+        window.addEventListener('error', function(e) {
+            addDebugLog(`❌ GLOBAL ERROR: ${e.message} at ${e.filename}:${e.lineno}`, 'error');
+            if (e.filename && e.filename.includes('app.js')) {
+                updateLoadStage('Execute', 'error', e.message);
+                document.getElementById('syntaxErrorMsg').innerHTML = `Error in app.js: ${e.message}`;
+                document.getElementById('syntaxErrorStack').innerHTML = `File: ${e.filename}<br>Line: ${e.lineno}<br>Column: ${e.colno}<br><br>This is likely a syntax error or missing function.`;
+                document.getElementById('syntaxError').style.display = 'block';
+            }
+        });
+        
+        window.addEventListener('unhandledrejection', function(e) {
+            addDebugLog(`❌ UNHANDLED REJECTION: ${e.reason}`, 'error');
+        });
+        
+        window.safeLogin = safeLogin;
+        window.toggleEntryOptions = toggleEntryOptions;
+        
+        addDebugLog('Debug system initialized - waiting for app.js to load...', 'info');
+    </script>
+</body>
+</html>
