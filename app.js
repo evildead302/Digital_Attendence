@@ -167,7 +167,8 @@
             return false;
         }
     }
-
+window.addDebugLog('GENERAL CHECK: Line 170 reached', 'info');
+    
     // ==================== SERVICE WORKER COMMUNICATION ====================
     function setupServiceWorkerListener() {
         if ('serviceWorker' in navigator) {
