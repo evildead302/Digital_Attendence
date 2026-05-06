@@ -144,7 +144,8 @@
         if (homePeriod) homePeriod.textContent = ampm;
         if (homeDate) homeDate.textContent = dateStr;
     }
-
+window.addDebugLog('GENERAL CHECK: Line 147 reached', 'info');
+    
     // ==================== SERVICE WORKER REGISTRATION ====================
     async function registerServiceWorker() {
         if (!('serviceWorker' in navigator)) {
