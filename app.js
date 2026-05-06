@@ -1,4 +1,5 @@
 // ==================== APP.JS - ULTRA DEBUG VERSION WITH OTP, DYNAMIC USER SETTINGS & ALARMS ====================
+alert("DEBUG 0: Script Started");
 alert("CHECK 1: app.js is CONNECTED");
 console.log("!!! DEBUG: SCRIPT START");
 
