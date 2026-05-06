@@ -521,6 +521,8 @@
             }
         }, 60000); // Check every minute
     }
+    window.addDebugLog('CRITICAL: [Marker 500] Reached 500 lines - Core Logic initialized', 'success');
+    
 
     // ==================== HELPER FUNCTION FOR LOCAL TIME (FIXED) ====================
     // This function now properly stores local time without UTC conversion
