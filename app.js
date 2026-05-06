@@ -3006,7 +3006,7 @@ window.addDebugLog('GENERAL CHECK: Line 170 reached', 'info');
         let checkoutHour = checkinHour + totalWorkHours;
         let checkoutMinute = checkinMinute;
         
-        window.addDebugLog(`[Alarm] Calculated checkout (before normalization): hour=${checkoutHour}, minute=${checkoutMinute}', 'debug');
+        window.addDebugLog(`[Alarm] Calculated checkout (before normalization): hour=${checkoutHour}, minute=${checkoutMinute}`, 'debug');
         
         // Handle overflow to next day
         if (checkoutHour >= 24) {
