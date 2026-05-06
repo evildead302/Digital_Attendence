@@ -1,4 +1,7 @@
 // ==================== APP.JS - ULTRA DEBUG VERSION WITH OTP, DYNAMIC USER SETTINGS & ALARMS ====================
+alert("CHECK 1: app.js is CONNECTED");
+console.log("!!! DEBUG: SCRIPT START");
+
 (function() {
     if (typeof window.addDebugLog !== 'function') {
         window.addDebugLog = function(msg, type) {
