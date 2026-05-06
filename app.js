@@ -5,6 +5,7 @@
             console.log(`[${type}] ${msg}`);
         };
     }
+    console.error("!!! GENERAL DEBUG: [0] START OF FILE REACHED");
     
     window.addDebugLog('app.js: Loading started...', 'info');
 
