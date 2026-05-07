@@ -596,7 +596,7 @@
                 throw new Error(`HTTP ${response.status}`);
             }
             
-            const data = await response.json();
+            const data = await response.text();
             
             if (data.success && data.csv) {
                 // Create download link
