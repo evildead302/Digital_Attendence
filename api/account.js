@@ -835,8 +835,7 @@ function generateCSVFromEntries(entries, user, fromDate, toDate) {
         'OT Adjustment',
         'AL Expiry Date',
         'CPL Expiry Date',
-        'Adjustment Note',
-        'Sync Status'
+        'Adjustment Note'
     ];
     
     const rows = [];
@@ -880,8 +879,7 @@ function generateCSVFromEntries(entries, user, fromDate, toDate) {
             entry.ot_adjustment || 0,
             entry.al_expiry_date || '',
             entry.cpl_expiry_date || '',
-            escapeCSV(entry.adjustment_note || ''),
-            entry.sync_status || ''
+            escapeCSV(entry.adjustment_note || '')
         ];
         
         rows.push(row.join(','));
