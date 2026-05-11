@@ -54,14 +54,14 @@
     // Template data - ALL SUNDAYS ARE HOLIDAYS with alternating CPL
     // UPDATED: Saturday base 8 hours with CPL 1, Friday base 8.5 hours
     let weeklyTemplate = {
-        monday: { base: 8, maxOT: 1, cpl: 0 },
-        tuesday: { base: 8, maxOT: 1, cpl: 0 },
-        wednesday: { base: 8, maxOT: 1, cpl: 0 },
-        thursday: { base: 8, maxOT: 1, cpl: 0 },
-        friday: { base: 8.5, maxOT: 1, cpl: 0 },
-        saturday: { base: 8, maxOT: 1, cpl: 1 },
+        monday: { base: 9, maxOT: 2, cpl: 0 },
+        tuesday: { base: 9, maxOT: 2, cpl: 0 },
+        wednesday: { base: 9, maxOT: 2, cpl: 0 },
+        thursday: { base: 9, maxOT: 2, cpl: 0 },
+        friday: { base: 9.5, maxOT: 2, cpl: 0 },
+        saturday: { base: 9, maxOT: 2, cpl: 0 },
         // ALL Sundays are holidays with alternating CPL
-        sundayOdd: { base: 8, maxOT: 0, cpl: 1.0, isHoliday: true },  // 1st, 3rd, 5th Sundays (1.0 CPL)
+        sundayOdd: { base: 9, maxOT: 0, cpl: 1.0, isHoliday: true },  // 1st, 3rd, 5th Sundays (1.0 CPL)
         sundayEven: { base: 6, maxOT: 0, cpl: 0.5, isHoliday: true }  // 2nd, 4th Sundays (0.5 CPL)
     };
 
