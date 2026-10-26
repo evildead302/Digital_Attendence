@@ -1,35 +1,24 @@
 // api/cron-backup.js
-// Daily backup of every user's attendance data to a Cloudflare R2 bucket.
-// Triggered once a day by Vercel Cron (see vercel.json). Each file uses the SAME format as the in-app
-// backup, so it can be restored from Settings > Export Data > Backup & Restore.
-//
-// Files:  <prefix>/YYYY-MM-DD/user-<id>.json   and   <prefix>/YYYY-MM-DD/_summary.json
-// Passwords / tokens are never included.
-
 import { neon } from '@neondatabase/serverless';
 import { S3Client, PutObjectCommand, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 
 const sql = neon(process.env.DATABASE_URL);
 
 const PREFIX = (process.env.R2_BACKUP_PREFIX || 'attendance-backups').replace(/^\/+|\/+$/g, '');
-const KEEP_DAYS = parseInt(process.env.BACKUP_KEEP_DAYS || '60', 10);   // 0 = keep forever
+const KEEP_DAYS = parseInt(process.env.BACKUP_KEEP_DAYS || '60', 10);
 
 const pad = (n) => String(n).padStart(2, '0');
 
-// DATE column -> 'YYYY-MM-DD'
 function dateOnly(v) {
     if (!v) return v;
     if (v instanceof Date) return `${v.getUTCFullYear()}-${pad(v.getUTCMonth() + 1)}-${pad(v.getUTCDate())}`;
     return String(v).slice(0, 10);
 }
-
-// TIMESTAMP column -> 'YYYY-MM-DD HH:MM:SS' (local wall-clock text, the format the app stores)
 function dateTime(v) {
     if (!v) return null;
     const s = v instanceof Date ? v.toISOString() : String(v);
     return s.replace('T', ' ').replace(/\.\d+/, '').replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
 }
-
 function cleanRow(row) {
     const out = { ...row };
     out.date = dateOnly(row.date);
@@ -39,7 +28,6 @@ function cleanRow(row) {
     if ('cpl_expiry_date' in out) out.cpl_expiry_date = dateOnly(out.cpl_expiry_date);
     return out;
 }
-
 async function pruneOld(s3, bucket, todayKey) {
     if (!(KEEP_DAYS > 0)) return 0;
     const cutoff = new Date(Date.parse(todayKey) - KEEP_DAYS * 86400000).toISOString().slice(0, 10);
@@ -60,9 +48,10 @@ async function pruneOld(s3, bucket, todayKey) {
 }
 
 export default async function handler(req, res) {
-    // Vercel Cron sends "Authorization: Bearer <CRON_SECRET>" when the CRON_SECRET env var is set.
     const secret = process.env.CRON_SECRET;
-    if (!secret || req.headers.authorization !== `Bearer ${secret}`) {
+    const headerOk = secret && req.headers.authorization === `Bearer ${secret}`;
+    const queryOk  = secret && req.query?.secret === secret;   // <-- test via browser
+    if (!headerOk && !queryOk) {
         return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
@@ -84,7 +73,7 @@ export default async function handler(req, res) {
         });
 
         const now = new Date();
-        const todayKey = now.toISOString().slice(0, 10);          // UTC date used in the folder name
+        const todayKey = now.toISOString().slice(0, 10);
 
         const users = await sql`
             SELECT id, email, has_ot, has_cpl, limit_annual, limit_casual, limit_sick
@@ -104,7 +93,7 @@ export default async function handler(req, res) {
         let totalEntries = 0;
         for (const u of users) {
             const entries = byUser.get(String(u.id)) || [];
-            if (entries.length === 0) continue;                    // nothing to back up for this user
+            if (entries.length === 0) continue;
             const body = JSON.stringify({
                 app: 'attendance',
                 version: 1,
@@ -122,7 +111,6 @@ export default async function handler(req, res) {
             totalEntries += entries.length;
         }
 
-        // upload, 5 at a time
         for (let i = 0; i < files.length; i += 5) {
             await Promise.all(files.slice(i, i + 5).map((f) => s3.send(new PutObjectCommand({
                 Bucket: bucket, Key: f.key, Body: f.body, ContentType: 'application/json'
@@ -147,9 +135,9 @@ export default async function handler(req, res) {
         catch (e) { console.error('[Backup] Cleanup of old backups failed:', e.message); }
 
         console.log(`[Backup] ${todayKey}: ${files.length} user file(s), ${totalEntries} entries, ${deleted} old file(s) removed`);
-        return res.status(200).json({ success: true, ...summary, files: undefined, old_files_deleted: deleted });
+        return res.status(200).json({ success: true, ...summary, old_files_deleted: deleted });
     } catch (error) {
         console.error('[Backup] Failed:', error);
         return res.status(500).json({ success: false, message: 'Backup failed: ' + (error && error.message ? error.message : 'unknown error') });
     }
-}
+                                                                                    }
