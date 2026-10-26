@@ -1,6 +1,6 @@
 // api/cron-backup.js
 import { neon } from '@neondatabase/serverless';
-import { S3Client, PutObjectCommand, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, ListObjectsV2Command, DeleteObjectsCommand, DeleteObjectCommand, HeadBucketCommand } from '@aws-sdk/client-s3';
 
 const sql = neon(process.env.DATABASE_URL);
 
@@ -47,20 +47,176 @@ async function pruneOld(s3, bucket, todayKey) {
     return doomed.length;
 }
 
-export default async function handler(req, res) {
-    const secret = process.env.CRON_SECRET_1;
-    const headerOk = secret && req.headers.authorization === `Bearer ${secret}`;
-    const queryOk  = secret && req.query?.secret === secret;   // <-- test via browser
-    if (!headerOk && !queryOk) {
-        return res.status(401).json({ success: false, message: 'Unauthorized' });
+// ---------- DEBUG HANDLER ----------
+async function handleDebug(req, res) {
+    const out = {
+        step: 'start',
+        env: {},
+        auth: {},
+        db: {},
+        r2: {},
+        errors: []
+    };
+
+    // 1. Env vars
+    const envKeys = [
+        'CRON_SECRET', 'CRON_SECRET_1',
+        'DATABASE_URL',
+        'R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET', 'R2_BACKUP_PREFIX', 'BACKUP_KEEP_DAYS'
+    ];
+    for (const k of envKeys) {
+        const v = process.env[k];
+        out.env[k] = {
+            present: !!v,
+            length: v ? v.length : 0,
+            // show a tiny hint without leaking the full secret
+            preview: v ? (v.length <= 6 ? v : v.slice(0, 3) + '…' + v.slice(-2)) : null
+        };
     }
 
+    // 2. Auth check
+    const secret = process.env.CRON_SECRET_1 || process.env.CRON_SECRET;
+    out.auth = {
+        active_secret_source: process.env.CRON_SECRET_1 ? 'CRON_SECRET_1' : (process.env.CRON_SECRET ? 'CRON_SECRET' : 'none'),
+        header_received: req.headers.authorization ? 'yes' : 'no',
+        header_matches: !!(secret && req.headers.authorization === `Bearer ${secret}`),
+        query_secret_received: req.query?.secret ? 'yes' : 'no',
+        query_secret_matches: !!(secret && req.query?.secret === secret),
+        query_secret_length: (req.query?.secret || '').length,
+        expected_secret_length: (secret || '').length
+    };
+
+    // 3. DB connection test
+    out.step = 'db';
+    try {
+        if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL missing');
+        const t0 = Date.now();
+        const r = await sql`SELECT 1 AS ok`;
+        out.db.connected = r?.[0]?.ok === 1;
+        out.db.latency_ms = Date.now() - t0;
+        const cnt = await sql`SELECT COUNT(*)::int AS n FROM users`;
+        out.db.users_count = cnt?.[0]?.n ?? null;
+        const cnt2 = await sql`SELECT COUNT(*)::int AS n FROM attendance_ledger`;
+        out.db.entries_count = cnt2?.[0]?.n ?? null;
+    } catch (e) {
+        out.db.connected = false;
+        out.errors.push('DB: ' + e.message);
+    }
+
+    // 4. R2 connection test
+    out.step = 'r2';
+    const missingR2 = ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET']
+        .filter((k) => !process.env[k]);
+    out.r2.missing_env = missingR2;
+    if (!missingR2.length) {
+        try {
+            const s3 = new S3Client({
+                region: 'auto',
+                endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+                credentials: {
+                    accessKeyId: process.env.R2_ACCESS_KEY_ID,
+                    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY
+                }
+            });
+            out.r2.endpoint = `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
+            out.r2.bucket = process.env.R2_BUCKET;
+
+            // 4a. HeadBucket
+            try {
+                await s3.send(new HeadBucketCommand({ Bucket: process.env.R2_BUCKET }));
+                out.r2.head_bucket = 'ok';
+            } catch (e) {
+                out.r2.head_bucket = 'failed: ' + e.message;
+                out.errors.push('R2 HeadBucket: ' + e.message);
+            }
+
+            // 4b. Put a tiny test object
+            const testKey = `${PREFIX}/_debug/ping-${Date.now()}.json`;
+            try {
+                await s3.send(new PutObjectCommand({
+                    Bucket: process.env.R2_BUCKET,
+                    Key: testKey,
+                    Body: JSON.stringify({ ping: true, at: new Date().toISOString() }),
+                    ContentType: 'application/json'
+                }));
+                out.r2.put_object = 'ok';
+                out.r2.test_key = testKey;
+            } catch (e) {
+                out.r2.put_object = 'failed: ' + e.message;
+                out.errors.push('R2 PutObject: ' + e.message);
+            }
+
+            // 4c. List (proves read permission)
+            try {
+                const list = await s3.send(new ListObjectsV2Command({
+                    Bucket: process.env.R2_BUCKET,
+                    Prefix: PREFIX + '/',
+                    MaxKeys: 5
+                }));
+                out.r2.list_object = 'ok';
+                out.r2.sample_keys = (list.Contents || []).map((o) => o.Key);
+            } catch (e) {
+                out.r2.list_object = 'failed: ' + e.message;
+                out.errors.push('R2 List: ' + e.message);
+            }
+
+            // 4d. Cleanup test object
+            if (out.r2.put_object === 'ok') {
+                try {
+                    await s3.send(new DeleteObjectCommand({ Bucket: process.env.R2_BUCKET, Key: testKey }));
+                    out.r2.delete_object = 'ok';
+                } catch (e) {
+                    out.r2.delete_object = 'failed: ' + e.message;
+                    out.errors.push('R2 Delete: ' + e.message);
+                }
+            }
+        } catch (e) {
+            out.errors.push('R2 client init: ' + e.message);
+        }
+    } else {
+        out.errors.push('R2 env vars missing: ' + missingR2.join(', '));
+    }
+
+    out.step = 'done';
+    out.success = out.errors.length === 0;
+    return res.status(200).json(out);
+}
+
+// ---------- MAIN HANDLER ----------
+export default async function handler(req, res) {
+    // ---- DEBUG MODE ----
+    if (req.query?.debug === '1') {
+        return handleDebug(req, res);
+    }
+
+    // ---- AUTH ----
+    const secret = process.env.CRON_SECRET_1 || process.env.CRON_SECRET;
+    const headerOk = secret && req.headers.authorization === `Bearer ${secret}`;
+    const queryOk  = secret && req.query?.secret === secret;
+    if (!headerOk && !queryOk) {
+        return res.status(401).json({
+            success: false,
+            message: 'Unauthorized',
+            hint: {
+                active_secret_source: process.env.CRON_SECRET_1 ? 'CRON_SECRET_1' : (process.env.CRON_SECRET ? 'CRON_SECRET' : 'none'),
+                secret_present: !!secret,
+                header_present: !!req.headers.authorization,
+                query_secret_present: !!req.query?.secret,
+                // lengths only — do NOT leak values
+                expected_len: (secret || '').length,
+                received_query_len: (req.query?.secret || '').length
+            }
+        });
+    }
+
+    // ---- ENV CHECK ----
     const missing = ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET', 'DATABASE_URL']
         .filter((k) => !process.env[k]);
     if (missing.length) {
         return res.status(500).json({ success: false, message: 'Missing environment variables: ' + missing.join(', ') });
     }
 
+    // ---- RUN BACKUP ----
     try {
         const bucket = process.env.R2_BUCKET;
         const s3 = new S3Client({
