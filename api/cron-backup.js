@@ -48,7 +48,7 @@ async function pruneOld(s3, bucket, todayKey) {
 }
 
 export default async function handler(req, res) {
-    const secret = process.env.CRON_SECRET;
+    const secret = process.env.CRON_SECRET_1;
     const headerOk = secret && req.headers.authorization === `Bearer ${secret}`;
     const queryOk  = secret && req.query?.secret === secret;   // <-- test via browser
     if (!headerOk && !queryOk) {
